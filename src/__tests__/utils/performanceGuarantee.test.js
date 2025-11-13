@@ -384,34 +384,38 @@ describe('Performance Guarantee Utils', () => {
       const metrics = calculatePortfolioMetrics(mockVintages)
 
       // Vintage 1: 6 months old
-      // Cash collections are cumulative, sum first 6 months: 2.5+5.2+8.1+11.0+14.0+17.0 = 57.8%
-      // Total cash = 57.8% of $1M = $578k, pre-hurdle (75% split)
-      // Flobase share = $578k * 0.75 = $433.5k
+      // Cash collections array contains cumulative values: [2.5, 5.2, 8.1, 11.0, 14.0, 17.0]
+      // At month 6, cashCollections[5] = 17.0% (NOT sum of all values)
+      // Total cash = 17.0% of $1M = $170k
+      // Hurdle = 125% of $1M = $1.25M, $170k < $1.25M, so pre-hurdle (75% split)
+      // Flobase share = $170k * 0.75 = $127.5k
 
       // Vintage 2: 9 months old
-      // Sum first 9 months: 3+6+9+12+15+18+21+24+27 = 135%
-      // Total cash = 135% of $500k = $675k, post-hurdle (hurdle = 125% = $625k)
-      // Flobase share = $675k * 0.50 = $337.5k
+      // cashCollections[8] = 27.0% at month 9
+      // Total cash = 27.0% of $500k = $135k
+      // Hurdle = 125% of $500k = $625k, $135k < $625k, so pre-hurdle (75% split)
+      // Flobase share = $135k * 0.75 = $101.25k
 
-      // Total = $771k
-      expect(metrics.totalCashCollected).toBeCloseTo(771000, 0)
+      // Total = $127.5k + $101.25k = $228.75k
+      expect(metrics.totalCashCollected).toBeCloseTo(228750, 0)
     })
 
     it('should calculate cancelled debt correctly', () => {
       const metrics = calculatePortfolioMetrics(mockVintages)
 
-      // Vintage 1: 6 months, cumulative sum: 0.5+1.0+1.5+2.0+2.5+3.0 = 10.5% of $14.285M
-      // Vintage 2: 9 months, cumulative sum: 1+1.5+2+2.5+3+3.5+4+4.5+5 = 27% of $7.142M
-      // Total cancelled debt calculation
-      expect(metrics.totalCancelledDebt).toBeGreaterThan(0)
+      // Vintage 1: 6 months, cancellations[5] = 3.0% of $14,285,714 = $428,571.42
+      // Vintage 2: 9 months, cancellations[8] = 5.0% of $7,142,857 = $357,142.85
+      // Total = $785,714.27
+      expect(metrics.totalCancelledDebt).toBeCloseTo(785714, -1) // Within $5
     })
 
     it('should calculate settled debt correctly', () => {
       const metrics = calculatePortfolioMetrics(mockVintages)
 
-      // Vintage 1: 6 months, 16% of $14.285M
-      // Vintage 2: 9 months, 29% of $7.142M
-      expect(metrics.totalSettledDebt).toBeGreaterThan(0)
+      // Vintage 1: 6 months, settlements[5] = 16.0% of $14,285,714 = $2,285,714.24
+      // Vintage 2: 9 months, settlements[8] = 29.0% of $7,142,857 = $2,071,428.53
+      // Total = $4,357,142.77
+      expect(metrics.totalSettledDebt).toBeCloseTo(4357143, -1) // Within $5
     })
 
     it('should calculate active debt correctly', () => {
@@ -469,10 +473,18 @@ describe('Performance Guarantee Utils', () => {
 
       const metrics = calculatePortfolioMetrics(postHurdleVintages)
 
-      // 6 months old, sum: 30+60+90+120+140+150 = 590% of $100k = $590k
-      // Hurdle = 125% of $100k = $125k, cash > hurdle so post-hurdle
-      // Flobase share = $590k * 0.50 = $295k
-      expect(metrics.totalCashCollected).toBeCloseTo(295000, 0)
+      // 6 months old, cashCollections[5] = 150%
+      // Total cash = 150% of $150k = $150k
+      // Hurdle = 125% of $100k = $125k, $150k > $125k so post-hurdle (50% split)
+      // Flobase share = $150k * 0.50 = $75k
+      expect(metrics.totalCashCollected).toBeCloseTo(75000, 0)
+    })
+
+    it('should throw error when vintages is not an array', () => {
+      expect(() => calculatePortfolioMetrics(null)).toThrow('vintages must be an array')
+      expect(() => calculatePortfolioMetrics(undefined)).toThrow('vintages must be an array')
+      expect(() => calculatePortfolioMetrics('not-an-array')).toThrow('vintages must be an array')
+      expect(() => calculatePortfolioMetrics({})).toThrow('vintages must be an array')
     })
   })
 })

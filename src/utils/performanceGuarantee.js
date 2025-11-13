@@ -116,6 +116,10 @@ export function checkPerformanceGuarantee(vintage) {
  * @returns {Object} - Aggregated metrics
  */
 export function calculatePortfolioMetrics(vintages) {
+  if (!Array.isArray(vintages)) {
+    throw new Error('vintages must be an array')
+  }
+
   const totalCapitalDeployed = vintages.reduce((sum, v) => sum + v.purchasePrice, 0)
   const totalEnrolledDebt = vintages.reduce((sum, v) => sum + v.totalEnrolledDebt, 0)
 
@@ -123,9 +127,13 @@ export function calculatePortfolioMetrics(vintages) {
   const totalCashCollected = vintages.reduce((sum, v) => {
     if (!v.performance?.cashCollections) return sum
     const vintageAge = calculateVintageAge(v.purchaseDate)
-    const cumulativeCashPct = v.performance.cashCollections
-      .slice(0, Math.min(vintageAge, v.performance.cashCollections.length))
-      .reduce((acc, val) => acc + val, 0)
+
+    // FIXED: cashCollections array contains cumulative percentages, not incremental
+    // So we just take the value at vintageAge index, not sum all values
+    const cumulativeCashPct = vintageAge > 0
+      ? (v.performance.cashCollections[Math.min(vintageAge - 1, v.performance.cashCollections.length - 1)] || 0)
+      : 0
+
     const totalCash = (cumulativeCashPct / 100) * v.purchasePrice
 
     // Determine current phase
@@ -147,16 +155,18 @@ export function calculatePortfolioMetrics(vintages) {
     const vintageAge = calculateVintageAge(v.purchaseDate)
 
     if (v.performance.cancellations) {
-      const cumulativeCancelPct = v.performance.cancellations
-        .slice(0, Math.min(vintageAge, v.performance.cancellations.length))
-        .reduce((acc, val) => acc + val, 0)
+      // FIXED: cancellations array contains cumulative percentages
+      const cumulativeCancelPct = vintageAge > 0
+        ? (v.performance.cancellations[Math.min(vintageAge - 1, v.performance.cancellations.length - 1)] || 0)
+        : 0
       totalCancelledDebt += (cumulativeCancelPct / 100) * v.totalEnrolledDebt
     }
 
     if (v.performance.settlements) {
-      const cumulativeSettlePct = v.performance.settlements
-        .slice(0, Math.min(vintageAge, v.performance.settlements.length))
-        .reduce((acc, val) => acc + val, 0)
+      // FIXED: settlements array contains cumulative percentages
+      const cumulativeSettlePct = vintageAge > 0
+        ? (v.performance.settlements[Math.min(vintageAge - 1, v.performance.settlements.length - 1)] || 0)
+        : 0
       totalSettledDebt += (cumulativeSettlePct / 100) * v.totalEnrolledDebt
     }
   })
